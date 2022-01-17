@@ -1,53 +1,99 @@
 #include <SoftwareSerial.h>
- 
-SoftwareSerial HC12(8,7);
- 
-int PotPin1 = A2;
-int PotPin2 = A3;
- 
-int PotVal1;
-int PotVal2;
 
-int angle1;
-int angle2;
+/** 
+  Pre-processor directives 
+  (not stored in Arduino memory)
+**/
+
+#define potPin1 A6
+#define potPin2 A1
+#define setupDelay 500
+
+/** 
+  Other program variables
+  (stored in Arduino memory)
+**/
+
+int angle1,     potVal1;
+int angle2,     potVal2;
+int boundLow,   boundHigh;
+
+unsigned long   lastTimestamp;
+unsigned long   timeDelay   =   100;
 
 String input;
-
-int boundLow;
-int boundHigh;
-
 const char delimiter = ',';
 const char finald = '.';
- 
-int stupD = 500; //Setup Delay
- 
+
+SoftwareSerial HC12(9,8);
+
 void setup() {
+   
+  pinMode(potPin1, INPUT);
+  pinMode(potPin2, INPUT);
+
+  HC12.begin(115200);
+  Serial.begin(115200);
+  delay(setupDelay);
   
-  Serial.begin(9600);
- 
-  pinMode(PotPin1, INPUT);
-  pinMode(PotPin2, INPUT);
+  lastTimestamp = millis();
 
-   HC12.begin(9600);
-   delay(stupD);
+}
 
+void updatePotReadings(){
+  
+  potVal1 = analogRead(potPin1);
+  potVal2 = analogRead(potPin2);
+
+}
+
+String buildMessagePayload(int angles[2]){
+  
+  String message = "s";
+  
+  for(uint8_t i=0; i < 2; i++){
+    
+    message += String(angles[i]);
+  
+    if(i == (2-1))
+      break;
+
+    message += String(delimiter);
+  
+  }
+  
+  message += finald;
+  message += "e";
+  
+  return message;
+
+}
+
+void runProcedure(){
+  
+  updatePotReadings();
+  
+  int angles[2];
+  
+  angles[0] = map(potVal1, 0, 1023, 1000, 2000); 
+  angles[1] = map(potVal2, 0, 1023, 1000, 2000);
+   
+  String message = buildMessagePayload(angles);
+
+  Serial.println(message);
+  HC12.println(message);
+  
+  lastTimestamp = millis();
+  
 }
  
 void loop() {
- 
-  PotVal1 = analogRead(PotPin1); 
-  PotVal2 = analogRead(PotPin2); 
   
-  angle1 = map(PotVal1, 0, 1023, 0, 180); 
-  angle2 = map(PotVal2, 0, 1023, 0, 180);
-   
-  String angle1S = String(angle1);
-  String angle2S = String(angle2);
+  unsigned long currentTime = millis();
   
-  String message = "s" + angle1S + delimiter + angle2S + finald + "e";
- 
-  HC12.println(message);
+  if(currentTime < (lastTimestamp + timeDelay))
+    return;
   
-  delay(100);
+  runProcedure();
 
 }
