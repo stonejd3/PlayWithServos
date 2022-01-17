@@ -1,48 +1,75 @@
 #include <Servo.h>
  
-Servo Servo1;
-Servo Servo2;
- 
-int J1 = 8;
-int J2 = 9;
+/** 
+  Pre-processor directives 
+  (not stored in Arduino memory)
+**/
 
-int J1H = 90;
-int J2H = 110;
- 
-int angle1 = J1H;
-int angle2 = J2H;
- 
-int angle1L = J1H;
-int angle2L = J2H;
+#define J1 8
+#define J2 9
+#define J1H 1500
+#define J2H 1611
 
-int boundLow;
-int boundHigh;
-int boundF;
-const char delimiter = ',';
-const char finald = '.';
+/** 
+  Other program variables
+  (stored in Arduino memory)
+**/
+
+Servo Servo1, Servo2;
+
+int angle1 = J1H, angle2 = J2H;
+int boundLow, boundHigh, boundF;
+
+uint8_t angle1ValuesIndex = 0, angle2ValuesIndex = 0;
+
+int angle1Values[10] = {
+  J1H,J1H,J1H,J1H,
+  J1H,J1H,J1H,J1H,
+  J1H,J1H
+};
+
+int angle2Values[10] = {
+  J2H,J2H,J2H,J2H,
+  J2H,J2H,J2H,J2H,
+  J2H,J2H
+};
+
+const char delimiter  = ',';
+const char finald     = '.';
  
 char incomingByte;
-String readBuffer = "";
-int byteD = 5; 
-int SMd = 250;
-int stupD = 500;
+String readBuffer     = "";
+
+int byteDelay   = 5; 
+int setupDelay  = 500;
  
+int average(int inputArray[10]){
+
+  int sum = 0;
+  
+  for(uint8_t i = 0; i < 10; i++)
+    sum += inputArray[i];
+  
+  return sum / 10;
+
+}
+  
 void setup() {
 
-  Serial.begin(9600);
+  Serial.begin(115200);
  
   Servo1.attach(J1);
   Servo2.attach(J2);
 
   servoWriter(J1H, J2H);
   
-  delay(stupD);
+  delay(setupDelay);
 
 }
  
 void loop() {
 
-  servoWriter(angle1L, angle2L);
+  servoWriter(average(angle1Values), average(angle2Values));
  
   readBuffer = "";
   boolean start = false;
@@ -50,7 +77,7 @@ void loop() {
   while (Serial.available()) {
 
     incomingByte = Serial.read();
-    delay(byteD);
+    delay(byteDelay);
     
     if (start == true) {
       
@@ -60,42 +87,41 @@ void loop() {
         start = false;
       }
     } else if (incomingByte == 's'){
-      start = true; //If true start reading the message
+      start = true;
     }
     
   }
  
-  String message = readBuffer; //Saves readBuffer contents to new String
+  String message = readBuffer;
   
    
-  if(message == ""){
+  if(message != ""){
     
-    angle1 = angle1L;
-    angle2 = angle2L;
-    servoWriter(angle1, angle2);
-     
-  } else {
+    boundLow = message.indexOf(delimiter);
+    angle1 = message.substring(0, boundLow).toInt();
     
-    boundLow = message.indexOf(delimiter); //Locates index of first delimiter i.e. comma https://www.arduino.cc/reference/en/language/variables/data-types/string/functions/indexof/
-    angle1 = message.substring(0, boundLow).toInt(); //.substring creates a sub string of input string starting at index position zero up to but not including first comma https://www.arduino.cc/reference/en/language/variables/data-types/string/functions/substring/
-           
-    boundHigh = message.indexOf(delimiter, boundLow+1); //This instance is going to search for the next delimiter i.e. comma starting at boundLow+1 i.e. one character after the previous comma https://www.arduino.cc/reference/en/language/variables/data-types/string/functions/indexof/
-    angle2 = message.substring(boundLow+1, boundHigh).toInt(); //Creates a substring of input starting one character after the first comma ending one character before the second comma
+    angle1ValuesIndex += 1;
+    angle1ValuesIndex %= 10;
+    
+    angle1Values[angle1ValuesIndex] = angle1;
+    
+    boundHigh = message.indexOf(delimiter, boundLow+1); 
+    angle2 = message.substring(boundLow+1, boundHigh).toInt();
+
+    angle2ValuesIndex += 1;
+    angle2ValuesIndex %= 10;
+    
+    angle2Values[angle2ValuesIndex] = angle2;
    
-    servoWriter(angle1, angle2);
-     
-  }   
- 
-  //delay(SMd);
- 
-  angle1L = angle1;
-  angle2L = angle2;
+  }
+  
+  servoWriter(average(angle1Values), average(angle2Values));
   
 }
 
 void servoWriter(int input1, int input2){
   
-  Servo1.write(input1); //Moves Specified Servo to Specified Angle
-  Servo2.write(input2); //Moves Specified Servo to Specified Angle
+  Servo1.writeMicroseconds(input1);
+  Servo2.writeMicroseconds(input2);
 
 }
